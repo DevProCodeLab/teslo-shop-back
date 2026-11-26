@@ -1,15 +1,21 @@
-version: '3'
-
-
+# `version` se omite a propósito: Docker Compose v2 lo ignora y advierte.
 services:
   db:
     image: postgres:14.3
     restart: always
     ports:
-      - "5432:5432"
+      - '5432:5432'
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     container_name: teslodb
     volumes:
       - ./postgres:/var/lib/postgresql/data
+    # Permite que otros servicios esperen a que Postgres acepte conexiones
+    # (depends_on con condition: service_healthy), y da señal de vida en
+    # `docker compose ps`. Es el mismo chequeo que usa el job test-e2e del CI.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-postgres}']
+      interval: 10s
+      timeout: 5s
+      retries: 5

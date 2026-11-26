@@ -1,0 +1,44 @@
+# ───────────────────────────────────────────────────────────────────────────
+# El build context se envía completo al daemon de Docker antes de ejecutar
+# cualquier instrucción del Dockerfile. Todo lo que no se excluya aquí se
+# copia, aunque el Dockerfile nunca lo use.
+# ───────────────────────────────────────────────────────────────────────────
+
+# CRÍTICO: data dir de Postgres montado por docker-compose. Son cientos de MB
+# de archivos binarios. Sin esta línea el `docker build` tarda minutos.
+postgres/
+
+# Dependencias y artefactos: se reconstruyen dentro de la imagen.
+node_modules
+dist
+coverage
+*.tsbuildinfo
+
+# Secretos: nunca deben entrar en una capa de imagen.
+.env
+.env.*
+!.env.template
+
+# Metadatos de desarrollo.
+.git
+.gitignore
+.github
+.vscode
+.idea
+docs
+*.md
+!README.md
+
+# Tests: la imagen de runtime no los necesita.
+test
+**/*.spec.ts
+
+# Subidas de usuario en local (static/products sí se copia: trae las imágenes
+# del seed que sirve el endpoint GET /api/files/product/:imageName).
+static/uploads
+
+# Logs y basura del SO.
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

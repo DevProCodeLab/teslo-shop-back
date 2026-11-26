@@ -1,0 +1,167 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# RELEASE — Construcción y publicación de la imagen Docker
+#
+# Se separa de ci.yml a propósito: CI valida, release distribuye. Un workflow
+# que hace ambas cosas acaba publicando artefactos desde ramas de trabajo.
+#
+# Publica en GHCR (GitHub Container Registry): ghcr.io/<owner>/<repo>
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  # Permite dispararlo a mano desde la pestaña Actions.
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false # nunca cancelar una publicación a medias
+
+# Mínimo privilegio. `packages: write` es lo único extra que necesitamos y es
+# lo que permite usar el GITHUB_TOKEN automático para GHCR: cero secrets manuales.
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Construir y publicar imagen
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login en ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN lo inyecta Actions automáticamente. No hay que crear
+          # ningún Personal Access Token para publicar en GHCR del mismo repo.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Deriva tags y labels OCI desde el contexto del evento, en lugar de
+      # hardcodearlos. Resultado:
+      #   push a main      -> :latest y :main-<sha corto>
+      #   tag v1.2.3       -> :1.2.3, :1.2 y :latest
+      - name: Calcular metadatos (tags y labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Construir y publicar
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Cache compartido con el job docker-build de ci.yml.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Resumen de la publicación
+        run: |
+          {
+            echo "## Imagen publicada"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo
+            echo "**Digest:** \`${{ steps.build.outputs.digest }}\`"
+            echo
+            echo "Descargar con:"
+            echo '```bash'
+            echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ═════════════════════════════════════════════════════════════════════════
+  # CASCARÓN DE DEPLOY — deliberadamente deshabilitado (`if: false`).
+  #
+  # Está aquí para que el día que elijas proveedor sólo tengas que:
+  #   1. Borrar la línea `if: false`.
+  #   2. Crear los secrets en Settings > Secrets and variables > Actions.
+  #   3. Descomentar el bloque de tu proveedor.
+  #
+  # Mientras `if: false` esté puesto, el job aparece como "skipped" en Actions,
+  # nunca como fallido.
+  # ═════════════════════════════════════════════════════════════════════════
+  deploy:
+    name: Desplegar (pendiente de configurar)
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: false
+
+    # `environment` habilita el historial de despliegues y, opcionalmente,
+    # aprobación manual (Settings > Environments > production > required reviewers).
+    # environment:
+    #   name: production
+    #   url: https://tu-api.ejemplo.com
+
+    steps:
+      - name: Marcador de posición
+        run: |
+          echo "Job de deploy sin configurar."
+          echo "Imagen lista para desplegar: ${{ needs.build-and-push.outputs.image }}"
+
+      # ─── Opción A: Railway ───────────────────────────────────────────────
+      # Secrets necesarios: RAILWAY_TOKEN
+      # - name: Deploy a Railway
+      #   run: |
+      #     npm i -g @railway/cli
+      #     railway redeploy --service teslo-api --yes
+      #   env:
+      #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      # ─── Opción B: Render ────────────────────────────────────────────────
+      # Secrets necesarios: RENDER_DEPLOY_HOOK_URL
+      # - name: Deploy a Render
+      #   run: curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+      # ─── Opción C: Fly.io ────────────────────────────────────────────────
+      # Secrets necesarios: FLY_API_TOKEN  (requiere fly.toml en el repo)
+      # - uses: superfly/flyctl-actions/setup-flyctl@master
+      # - name: Deploy a Fly.io
+      #   run: flyctl deploy --remote-only
+      #   env:
+      #     FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # ─── Opción D: VPS por SSH (docker compose pull && up) ───────────────
+      # Secrets necesarios: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY
+      # - name: Deploy por SSH
+      #   uses: appleboy/ssh-action@v1
+      #   with:
+      #     host: ${{ secrets.SSH_HOST }}
+      #     username: ${{ secrets.SSH_USER }}
+      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     script: |
+      #       cd /opt/teslo-api
+      #       docker compose pull
+      #       docker compose up -d --remove-orphans
+      #       docker image prune -f

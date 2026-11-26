@@ -1,0 +1,13 @@
+# Normaliza los finales de línea: el repo se edita en Windows (CRLF) pero el
+# CI corre en ubuntu-latest (LF). Sin esto, `prettier --check` falla en Actions
+# con diferencias invisibles en local.
+* text=auto eol=lf
+
+# Binarios: nunca normalizar.
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.pdf  binary

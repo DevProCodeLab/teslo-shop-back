@@ -11,7 +11,6 @@ import {
   Between,
   DataSource,
   ILike,
-  In,
   LessThanOrEqual,
   MoreThanOrEqual,
   Repository,
@@ -76,10 +75,10 @@ export class ProductsService {
       minPrice !== undefined && maxPrice !== undefined
         ? Between(minPrice, maxPrice)
         : minPrice !== undefined
-        ? MoreThanOrEqual(minPrice)
-        : maxPrice !== undefined
-        ? LessThanOrEqual(maxPrice)
-        : undefined;
+          ? MoreThanOrEqual(minPrice)
+          : maxPrice !== undefined
+            ? LessThanOrEqual(maxPrice)
+            : undefined;
 
     const products = await this.productRepository.find({
       take: limit,

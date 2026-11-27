@@ -1,9 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
-import { ValidRoles } from '../auth/interfaces';
-import { Auth } from '../auth/decorators';
-
 import { SeedService } from './seed.service';
 
 @ApiTags('Seed')
@@ -12,7 +9,9 @@ export class SeedController {
   constructor(private readonly seedService: SeedService) {}
 
   @Get()
-  // @Auth( ValidRoles.admin )
+  // Endpoint deliberadamente público para el curso.
+  // Para protegerlo: importar { Auth } de '../auth/decorators' y
+  // { ValidRoles } de '../auth/interfaces' y añadir @Auth(ValidRoles.admin).
   @ApiOperation({
     summary: 'Destruye y crea una nueva base de datos',
     description:

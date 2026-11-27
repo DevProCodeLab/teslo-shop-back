@@ -1,0 +1,162 @@
+{
+  "info": {
+    "name": "Teslo Shop API",
+    "description": "Colección para probar el backend NestJS de Teslo Shop. Prefijo global: /api",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" },
+    { "key": "token", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "imageName", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Seed",
+      "item": [
+        {
+          "name": "GET /seed (resetea BD)",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/seed" }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 201', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "if (body.token) pm.environment.set('token', body.token); pm.collectionVariables.set('token', body.token);"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"nuevo@google.com\",\n  \"password\": \"Abc123\",\n  \"fullName\": \"Nuevo Usuario\"\n}" },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "POST /auth/login (admin del seed)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 201', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test('devuelve token', () => pm.expect(body.token).to.be.a('string'));",
+              "pm.environment.set('token', body.token); pm.collectionVariables.set('token', body.token);"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"test1@google.com\",\n  \"password\": \"Abc123\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "GET /auth/check-status (renueva token)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "const body = pm.response.json();",
+              "if (body.token) pm.environment.set('token', body.token); pm.collectionVariables.set('token', body.token);"
+            ] } }
+          ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/auth/check-status" }
+        },
+        { "name": "GET /auth/private", "request": { "method": "GET", "url": "{{baseUrl}}/auth/private" } },
+        { "name": "GET /auth/private2 (admin|super-user)", "request": { "method": "GET", "url": "{{baseUrl}}/auth/private2" } },
+        { "name": "GET /auth/private3 (admin)", "request": { "method": "GET", "url": "{{baseUrl}}/auth/private3" } }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "GET /products (paginado y filtros)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "if (Array.isArray(body) && body.length) pm.collectionVariables.set('productId', body[0].id);"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/products?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" },
+                { "key": "gender", "value": "men", "disabled": true },
+                { "key": "minPrice", "value": "0", "disabled": true },
+                { "key": "maxPrice", "value": "300", "disabled": true },
+                { "key": "sizes", "value": "XS,S,M", "disabled": true },
+                { "key": "q", "value": "shirt", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /products/:term (uuid | slug | title)",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/products/{{productId}}" }
+        },
+        {
+          "name": "POST /products (auth)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 201) pm.collectionVariables.set('productId', pm.response.json().id);"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Camiseta Postman\",\n  \"price\": 99.99,\n  \"description\": \"Creada desde Postman\",\n  \"stock\": 10,\n  \"sizes\": [\"S\", \"M\", \"L\"],\n  \"gender\": \"unisex\",\n  \"tags\": [\"shirt\"],\n  \"images\": [\"1740176-00-A_0_2000.jpg\"]\n}" },
+            "url": "{{baseUrl}}/products"
+          }
+        },
+        {
+          "name": "PATCH /products/:id (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"price\": 150,\n  \"stock\": 5\n}" },
+            "url": "{{baseUrl}}/products/{{productId}}"
+          }
+        },
+        { "name": "DELETE /products/:id (admin)", "request": { "method": "DELETE", "url": "{{baseUrl}}/products/{{productId}}" } }
+      ]
+    },
+    {
+      "name": "Files",
+      "item": [
+        {
+          "name": "POST /files/product (form-data: file)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 201) pm.collectionVariables.set('imageName', pm.response.json().fileName);"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] },
+            "url": "{{baseUrl}}/files/product"
+          }
+        },
+        {
+          "name": "GET /files/product/:imageName",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/files/product/{{imageName}}" }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+# Dependabot abre PRs automáticos con actualizaciones de dependencias.
+# Como el CI corre en cada PR, cada actualización llega ya validada.
+version: 2
+
+updates:
+  # ─── Dependencias de npm ───────────────────────────────────────────────
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    open-pull-requests-limit: 5
+    labels: ['dependencias']
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+    groups:
+      # Nest publica sus paquetes en bloque: agruparlos evita 10 PRs por release.
+      nestjs:
+        patterns: ['@nestjs/*']
+      tooling:
+        patterns: ['eslint*', 'prettier', '@typescript-eslint/*', 'jest', 'ts-jest']
+    ignore:
+      # Los majors de Nest y TypeORM implican migración manual; se hacen a mano.
+      - dependency-name: '@nestjs/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'typeorm'
+        update-types: ['version-update:semver-major']
+
+  # ─── Actions del propio pipeline ───────────────────────────────────────
+  # Las actions se pinean por versión mayor (@v4). Dependabot avisa cuando
+  # sale una mayor nueva o cuando la actual queda deprecada.
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    labels: ['ci']
+    commit-message:
+      prefix: 'chore(ci)'
+
+  # ─── Imagen base del Dockerfile ────────────────────────────────────────
+  - package-ecosystem: 'docker'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    labels: ['docker']
+    commit-message:
+      prefix: 'chore(docker)'
